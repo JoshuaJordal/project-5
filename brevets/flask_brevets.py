@@ -54,21 +54,34 @@ def _calc_times():
     """
     app.logger.debug("Got a JSON request")
     km = request.args.get('km', 999, type=float)
+    miles = request.args.get('miles', 999, type=float)
     brevet = request.args.get('brevet', 200, int)
     time = request.args.get('time')
     app.logger.debug("km={}".format(km))
+    app.logger.debug("brevet={}".format(brevet))
+    if(km > (brevet * 1.2)):
+        _cleardb()
+        return flask.jsonify({"valid": 0})
     app.logger.debug("request.args: {}".format(request.args))
     open_time = acp_times.open_time(km, brevet, arrow.get(time)).format('YYYY-MM-DDTHH:mm')
     close_time = acp_times.close_time(km, brevet, arrow.get(time)).format('YYYY-MM-DDTHH:mm')
-    db.races.insert_one({"open": open_time, "close": close_time})
-    return flask.jsonify(result=1)
+    db.races.insert_one({"open": open_time, "close": close_time, "km": km, "miles": miles, "brevet": brevet, "time": time})
+    return flask.jsonify({"valid": 1})
 
 @app.route("/_get_times")
 def _get_times():
-    races = db.races.find_one({},{ "_id": 0 })
+    races = list(db.races.find({},{ "_id": 0 }))
     app.logger.debug("races={}".format(races))
+    def sortfunc(e):
+        return e['km']
+    races.sort(key=sortfunc)
     result = races
     return flask.jsonify(result=result)
+
+@app.route("/_cleardb")
+def _cleardb():
+    db.races.drop()
+    return flask.jsonify({})
 #############
 
 app.debug = CONFIG.DEBUG

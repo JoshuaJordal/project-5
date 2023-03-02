@@ -95,9 +95,10 @@ def close_time(control_dist_km, brevet_dist_km, brevet_start_time):
          time += remainder / speeds
          break
       i += 1
+    if(control_dist_km < 60):
+      time = (control_dist_km / 20) + 1
     hour = trunc(time)
     time = time - hour
     minute = round(time * 60)
     close_time = brevet_start_time.shift(hours=+hour, minutes=+minute)
     return close_time
-
