@@ -45,6 +45,28 @@ def page_not_found(error):
 #   These return JSON, rather than rendering pages.
 #
 ###############
+
+@app.route("/_insert_times", methods=["POST"])
+def _insert_times():
+    """
+    Calculates open/close times from miles, using rules
+    described at https://rusa.org/octime_alg.html.
+    Expects one URL-encoded argument, the number of miles.
+    """
+    app.logger.debug("Got a JSON request")
+    input_json = request.json
+    km = float(input_json["km"])
+    miles = float(input_json["miles"])
+    brevet = int(input_json["brevet"])
+    time = input_json["time"]
+    app.logger.debug("km={}".format(km))
+    if(km > (brevet * 1.2)):
+        return flask.jsonify({"valid": 0})
+    open_time = acp_times.open_time(km, brevet, arrow.get(time)).format('YYYY-MM-DDTHH:mm')
+    close_time = acp_times.close_time(km, brevet, arrow.get(time)).format('YYYY-MM-DDTHH:mm')
+    db.races.insert_one({"open": open_time, "close": close_time, "km": km, "miles": miles, "brevet": brevet, "time": time})
+    return flask.jsonify({"valid": 1})
+
 @app.route("/_calc_times")
 def _calc_times():
     """
@@ -54,21 +76,14 @@ def _calc_times():
     """
     app.logger.debug("Got a JSON request")
     km = request.args.get('km', 999, type=float)
-    miles = request.args.get('miles', 999, type=float)
     brevet = request.args.get('brevet', 200, int)
     time = request.args.get('time')
-    app.logger.debug("km={}".format(km))
-    app.logger.debug("brevet={}".format(brevet))
-    if(km > (brevet * 1.2)):
-        _cleardb()
-        return flask.jsonify({"valid": 0})
-    app.logger.debug("request.args: {}".format(request.args))
     open_time = acp_times.open_time(km, brevet, arrow.get(time)).format('YYYY-MM-DDTHH:mm')
     close_time = acp_times.close_time(km, brevet, arrow.get(time)).format('YYYY-MM-DDTHH:mm')
-    db.races.insert_one({"open": open_time, "close": close_time, "km": km, "miles": miles, "brevet": brevet, "time": time})
-    return flask.jsonify({"valid": 1})
+    result = {"open": open_time, "close": close_time}
+    return flask.jsonify(result=result)
 
-@app.route("/_get_times")
+@app.route("/_get_times", methods=["POST"])
 def _get_times():
     races = list(db.races.find({},{ "_id": 0 }))
     app.logger.debug("races={}".format(races))
